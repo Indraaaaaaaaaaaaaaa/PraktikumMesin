@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🌦️ CuacaAI - Prediksi Suhu Besok</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background: linear-gradient(to bottom right, #aee1f9, #f5fbff);
+            font-family: 'Poppins', sans-serif;
+            min-height: 100vh;
+        }
+
+        .fade-in {
+            animation: fadeIn 1.2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center">
+
+    <!-- Card Utama -->
+    <div
+        class="bg-white/90 backdrop-blur-lg shadow-2xl rounded-3xl p-10 w-full max-w-3xl fade-in border border-blue-200">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-extrabold text-blue-600 mb-3 flex items-center justify-center">
+                🌤️ Prediksi<span class="text-yellow-400">Cuaca</span>
+            </h1>
+            <p class="text-blue-800 text-lg">Prediksi suhu udara besok menggunakan model <b>LSTM</b> berbasis
+                data 60 hari terakhir.</p>
+        </div>
+
+        <!-- Form Input -->
+        <form action="/predict" method="POST" class="space-y-5">
+            <label for="sequence" class="block text-blue-900 font-semibold text-left">🌡️ Masukkan Data Suhu
+                (°C):</label>
+            <textarea id="sequence" name="sequence" rows="4"
+                class="w-full p-3 border-2 border-blue-300 rounded-2xl shadow-sm focus:ring-4 focus:ring-blue-200 focus:outline-none bg-blue-50 placeholder-blue-300"
+                placeholder="Contoh: 25.1, 24.9, 25.3, 26.0, 26.2, ..."></textarea>
+
+            <div class="flex justify-between">
+                <button type="button" onclick="autoFill()"
+                    class="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-4 py-2 rounded-xl font-semibold shadow-md transition duration-200">
+                    Auto Isi Contoh
+                </button>
+                <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-semibold shadow-md transition duration-200">
+                    Prediksi Sekarang
+                </button>
+            </div>
+        </form>
+
+        <!-- Hasil Prediksi -->
+        {% if prediction %}
+        <div class="mt-10 bg-blue-50 border border-blue-200 rounded-2xl p-6 fade-in">
+            <div class="flex items-center mb-3">
+                <span class="text-4xl mr-2">☁️</span>
+                <h2 class="text-2xl font-bold text-blue-700">Hasil Prediksi Suhu Besok</h2>
+            </div>
+            <p class="text-5xl font-extrabold text-blue-900 mb-2">{{ prediction }} </p>
+            <p class="text-blue-800">📊 RMSE: <b>{{ rmse }}</b> | MAE: <b>{{ mae }}</b></p>
+            <p class="text-blue-500 text-sm mt-2">Prediksi ini dihasilkan berdasarkan pola suhu 60 hari terakhir.</p>
+
+            <div class="mt-6">
+                <canvas id="resultChart" height="100"></canvas>
+            </div>
+        </div>
+
+        <script>
+            const ctx = document.getElementById('resultChart');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: 10 }, (_, i) => `Hari ${i + 1}`),
+                    datasets: [{
+                        label: 'Suhu Aktual',
+                        data: [26, 26.3, 26.1, 26.4, 26.7, 27, 26.9, 26.8, 26.5, 26.4],
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59,130,246,0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Prediksi Model',
+                        data: [26, 26.2, 26.4, 26.5, 26.6, 26.8, 26.9, 27, 27.1, {{ prediction| safe }}],
+                borderColor: '#F59E0B',
+                borderDash: [5, 5],
+                tension: 0.4
+            }]
+        },
+                options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } }
+            }
+      });
+        </script>
+
+        {% elif error %}
+        <div class="mt-10 bg-red-100 border border-red-300 p-4 rounded-xl text-red-700 fade-in">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="mt-10 text-center text-blue-800 text-sm border-t pt-4">
+            </b><br>
+            <i>Prediksi Data Sekuensial Menggunakan Model LSTM</i> ☁️
+        </div>
+    </div>
+
+    <!-- Script Auto Fill -->
+    <script>
+        function autoFill() {
+            const data = [
+                25.1, 24.9, 25.3, 25.0, 25.4, 26.0, 26.3, 26.1, 25.9, 26.2,
+                26.5, 26.7, 26.9, 27.0, 27.1, 27.3, 27.0, 26.8, 26.5, 26.2,
+                25.9, 25.7, 25.4, 25.0, 24.9, 24.7, 24.6, 24.5, 24.7, 24.9,
+                25.0, 25.2, 25.5, 25.8, 26.0, 26.3, 26.5, 26.7, 26.9, 27.1,
+                27.0, 26.8, 26.6, 26.3, 26.0, 25.7, 25.4, 25.2, 25.0, 24.8,
+                24.7, 24.9, 25.0, 25.3, 25.6, 25.9, 26.2, 26.5, 26.7, 27.0
+            ];
+            document.getElementById("sequence").value = data.join(", ");
+        }
+    </script>
+
+</body>
+
+</html>
